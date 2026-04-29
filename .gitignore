@@ -6,3 +6,9 @@ package-lock.json
 .idea
 yarn.lock
 pnpm-lock.yaml
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
