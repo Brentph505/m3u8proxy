@@ -99,6 +99,79 @@ export default function getHandler(options, proxy) {
       return;
     }
 
+    // Handle special proxy endpoints early, before hostname validation
+    const uri = new URL(req.url ?? web_server_url, "http://localhost:3000");
+    if (uri.pathname === "/m3u8-proxy") {
+      let headers = {};
+      try {
+        headers = JSON.parse(uri.searchParams.get("headers") ?? "{}");
+      } catch (e) {
+        res.writeHead(500);
+        res.end(e.message);
+        return;
+      }
+      const url = uri.searchParams.get("url");
+      return proxyM3U8(url ?? "", headers, res);
+    } else if (uri.pathname === "/ts-proxy") {
+      let headers = {};
+      try {
+        headers = JSON.parse(uri.searchParams.get("headers") ?? "{}");
+      } catch (e) {
+        res.writeHead(500);
+        res.end(e.message);
+        return;
+      }
+      const url = uri.searchParams.get("url");
+      return proxyTs(url ?? "", headers, req, res);
+    } else if (uri.pathname === "/") {
+      return res.end(readFileSync(join(__dirname, "../index.html")));
+    }
+
+    // Handle direct .m3u8 and .ts file requests - fallback for player-generated requests
+    // These often come from relative URLs in the m3u8 that weren't fully proxied
+    if (uri.pathname.endsWith(".m3u8") || uri.pathname.endsWith(".ts")) {
+      const referer = req.headers.referer;
+      let attemptUrl = null;
+      let attemptHeaders = {};
+
+      // Try to extract original context from referer if it's a proxy request
+      if (referer && referer.includes("?url=")) {
+        const match = referer.match(/[?&]url=([^&]+)(?:&|$)/);
+        const headersMatch = referer.match(/[?&]headers=([^&]+)(?:&|$)/);
+        
+        if (match) {
+          try {
+            const baseUrl = decodeURIComponent(match[1]);
+            const basePath = new URL(baseUrl).href.substring(0, new URL(baseUrl).href.lastIndexOf("/") + 1);
+            attemptUrl = new URL(uri.pathname.slice(1), basePath).href;
+            
+            if (headersMatch) {
+              attemptHeaders = JSON.parse(decodeURIComponent(headersMatch[1]));
+            }
+          } catch (e) {
+            // Silently fail and try alternative approaches
+          }
+        }
+      }
+
+      // If we couldn't extract from referer, try as-is
+      if (!attemptUrl) {
+        // Try to see if this looks like a relative path that needs a protocol
+        if (!uri.pathname.slice(1).includes("://")) {
+          attemptUrl = "https://" + uri.pathname.slice(1);
+        } else {
+          attemptUrl = uri.pathname.slice(1);
+        }
+      }
+
+      // Route to appropriate proxy based on file extension
+      if (uri.pathname.endsWith(".m3u8")) {
+        return proxyM3U8(attemptUrl, attemptHeaders, res);
+      } else if (uri.pathname.endsWith(".ts")) {
+        return proxyTs(attemptUrl, attemptHeaders, req, res);
+      }
+    }
+
     if ((Number(location.port) ?? 0) > 65535) {
       res.writeHead(400, "Invalid port", cors_headers);
       res.end("Port number too large: " + location.port);
@@ -106,36 +179,9 @@ export default function getHandler(options, proxy) {
     }
 
     if (!/^\/https?:/.test(req.url) && !isValidHostName(location.hostname)) {
-      const uri = new URL(req.url ?? web_server_url, "http://localhost:3000");
-      if (uri.pathname === "/m3u8-proxy") {
-        let headers = {};
-        try {
-          headers = JSON.parse(uri.searchParams.get("headers") ?? "{}");
-        } catch (e) {
-          res.writeHead(500);
-          res.end(e.message);
-          return;
-        }
-        const url = uri.searchParams.get("url");
-        return proxyM3U8(url ?? "", headers, res);
-      } else if (uri.pathname === "/ts-proxy") {
-        let headers = {};
-        try {
-          headers = JSON.parse(uri.searchParams.get("headers") ?? "{}");
-        } catch (e) {
-          res.writeHead(500);
-          res.end(e.message);
-          return;
-        }
-        const url = uri.searchParams.get("url");
-        return proxyTs(url ?? "", headers, req, res);
-      } else if (uri.pathname === "/") {
-        return res.end(readFileSync(join(__dirname, "../index.html")));
-      } else {
-        res.writeHead(404, "Invalid host", cors_headers);
-        res.end("Invalid host: " + location.hostname);
-        return;
-      }
+      res.writeHead(404, "Invalid host", cors_headers);
+      res.end("Invalid host: " + location.hostname);
+      return;
     }
 
     if (!hasRequiredHeaders(req.headers)) {

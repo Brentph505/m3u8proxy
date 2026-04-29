@@ -28,38 +28,41 @@ export default async function proxyM3U8(url, headers, res) {
     const newLines = [];
     for (const line of lines) {
       if (line.startsWith("#")) {
-        if (line.startsWith("#EXT-X-KEY:")) {
-          const regex = /https?:\/\/[^\""\s]+/g;
-          const url = `${web_server_url}${
-            "/ts-proxy?url=" +
-            encodeURIComponent(regex.exec(line)?.[0] ?? "") +
-            "&headers=" +
-            encodeURIComponent(JSON.stringify(headers))
-          }`;
-          newLines.push(line.replace(regex, url));
-        } else if (line.startsWith("#EXT-X-MEDIA:TYPE=AUDIO")) {
-          const regex = /https?:\/\/[^\""\s]+/g;
-          const url = `${web_server_url}${
-            "/m3u8-proxy?url=" +
-            encodeURIComponent(regex.exec(line)?.[0] ?? "") +
-            "&headers=" +
-            encodeURIComponent(JSON.stringify(headers))
-          }`;
-          newLines.push(line.replace(regex, url));
+        // Handle all tags that might contain URLs (URI attribute or full URLs)
+        if (line.includes("URI=") || /https?:\/\//.test(line)) {
+          // Process tags with URI attribute
+          if (line.includes("URI=")) {
+            const regex = /URI="([^"]+)"|URI=([^\s,]+)/g;
+            let processedLine = line;
+            let match;
+            while ((match = regex.exec(line)) !== null) {
+              const uriValue = match[1] || match[2];
+              try {
+                const uri = new URL(uriValue, url);
+                const proxiedUrl = `${web_server_url}/ts-proxy?url=${encodeURIComponent(uri.href)}&headers=${encodeURIComponent(JSON.stringify(headers))}`;
+                processedLine = processedLine.replace(uriValue, proxiedUrl);
+              } catch (e) {
+                // Keep original if URL parsing fails
+              }
+            }
+            newLines.push(processedLine);
+          } else {
+            // Handle inline https?:// URLs in comments
+            const regex = /https?:\/\/[^\""\s]+/g;
+            const processedUrl = `${web_server_url}/ts-proxy?url=${encodeURIComponent(regex.exec(line)?.[0] ?? "")}&headers=${encodeURIComponent(JSON.stringify(headers))}`;
+            newLines.push(line.replace(regex, processedUrl));
+          }
         } else {
           newLines.push(line);
         }
-      } else {
+      } else if (line.trim()) {
+        // Non-comment, non-empty lines are URLs/paths
         const uri = new URL(line, url);
         newLines.push(
-          `${
-            web_server_url +
-            "/m3u8-proxy?url=" +
-            encodeURIComponent(uri.href) +
-            "&headers=" +
-            encodeURIComponent(JSON.stringify(headers))
-          }`
+          `${web_server_url}/m3u8-proxy?url=${encodeURIComponent(uri.href)}&headers=${encodeURIComponent(JSON.stringify(headers))}`
         );
+      } else {
+        newLines.push(line);
       }
     }
 
@@ -94,29 +97,41 @@ export default async function proxyM3U8(url, headers, res) {
     const newLines = [];
     for (const line of lines) {
       if (line.startsWith("#")) {
-        if (line.startsWith("#EXT-X-KEY:")) {
-          const regex = /https?:\/\/[^\""\s]+/g;
-          const url = `${web_server_url}${
-            "/ts-proxy?url=" +
-            encodeURIComponent(regex.exec(line)?.[0] ?? "") +
-            "&headers=" +
-            encodeURIComponent(JSON.stringify(headers))
-          }`;
-          newLines.push(line.replace(regex, url));
+        // Handle all tags that might contain URLs (URI attribute or full URLs)
+        if (line.includes("URI=") || /https?:\/\//.test(line)) {
+          // Process tags with URI attribute
+          if (line.includes("URI=")) {
+            const regex = /URI="([^"]+)"|URI=([^\s,]+)/g;
+            let processedLine = line;
+            let match;
+            while ((match = regex.exec(line)) !== null) {
+              const uriValue = match[1] || match[2];
+              try {
+                const uri = new URL(uriValue, url);
+                const proxiedUrl = `${web_server_url}/ts-proxy?url=${encodeURIComponent(uri.href)}&headers=${encodeURIComponent(JSON.stringify(headers))}`;
+                processedLine = processedLine.replace(uriValue, proxiedUrl);
+              } catch (e) {
+                // Keep original if URL parsing fails
+              }
+            }
+            newLines.push(processedLine);
+          } else {
+            // Handle inline https?:// URLs in comments
+            const regex = /https?:\/\/[^\""\s]+/g;
+            const processedUrl = `${web_server_url}/ts-proxy?url=${encodeURIComponent(regex.exec(line)?.[0] ?? "")}&headers=${encodeURIComponent(JSON.stringify(headers))}`;
+            newLines.push(line.replace(regex, processedUrl));
+          }
         } else {
           newLines.push(line);
         }
-      } else {
+      } else if (line.trim()) {
+        // Non-comment, non-empty lines are URLs/paths
         const uri = new URL(line, url);
-
         newLines.push(
-          `${web_server_url}${
-            "/ts-proxy?url=" +
-            encodeURIComponent(uri.href) +
-            "&headers=" +
-            encodeURIComponent(JSON.stringify(headers))
-          }`
+          `${web_server_url}/ts-proxy?url=${encodeURIComponent(uri.href)}&headers=${encodeURIComponent(JSON.stringify(headers))}`
         );
+      } else {
+        newLines.push(line);
       }
     }
 
