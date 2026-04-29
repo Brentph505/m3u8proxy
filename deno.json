@@ -1,0 +1,10 @@
+{
+  "tasks": {
+    "dev": "deno run --allow-net --allow-env src/deno-deploy.js",
+    "start": "deno run --allow-net --allow-env src/deno-deploy.js"
+  },
+  "imports": {
+    "axios": "https://deno.land/x/axiod/mod.ts"
+  },
+  "exclude": ["node_modules", ".git"]
+}
