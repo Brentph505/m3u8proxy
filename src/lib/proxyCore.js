@@ -150,35 +150,6 @@ export function processM3U8Content(m3u8Content, baseUrl, headers = {}) {
 }
 
 /**
- * Fetch and process m3u8 playlist
- */
-export async function handleM3U8Proxy(url, headers = {}) {
-  try {
-    const response = await fetchUrl(url, { headers });
-    const m3u8Content = response.data;
-
-    const processedContent = processM3U8Content(m3u8Content, url, headers);
-
-    return {
-      status: 200,
-      body: processedContent,
-      headers: {
-        "Content-Type": "application/vnd.apple.mpegurl",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "*",
-        "Access-Control-Allow-Methods": "*",
-      },
-    };
-  } catch (err) {
-    return {
-      status: 500,
-      body: `Error fetching m3u8: ${err.message}`,
-      headers: { "Content-Type": "text/plain" },
-    };
-  }
-}
-
-/**
  * Fetch and proxy TS segment
  */
 export async function handleTSProxy(url, headers = {}) {
