@@ -8,13 +8,17 @@
  * 3. Deploy!
  */
 
-import { routeRequest } from "./lib/proxyCore.js";
+import { routeRequest, setBaseUrl } from "./lib/proxyCore.js";
 
 // Deno Deploy handler
 Deno.serve(async (req) => {
   const url = new URL(req.url);
   const pathname = url.pathname;
   const queryString = url.search.slice(1); // Remove leading ?
+
+  // Set the base URL for this request (for URL rewriting in m3u8)
+  const baseUrl = `${url.protocol}//${url.host}`;
+  setBaseUrl(baseUrl);
 
   // Extract headers from request
   const headers = {

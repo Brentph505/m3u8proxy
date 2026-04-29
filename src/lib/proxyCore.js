@@ -18,8 +18,21 @@ function getEnv(key, defaultValue) {
 
 const host = getEnv("HOST", "127.0.0.1");
 const port = getEnv("PORT", "8080");
-const web_server_url =
-  getEnv("PUBLIC_URL", "") || `http://${host}:${port}`;
+
+// For Deno Deploy, we need to detect the base URL from the request
+// Store it globally for the handler to set
+let _baseUrl = getEnv("PUBLIC_URL", "") || `http://${host}:${port}`;
+
+export function setBaseUrl(url) {
+  _baseUrl = url;
+}
+
+export function getBaseUrl() {
+  return _baseUrl;
+}
+
+// Shortcut for use in URL rewriting
+const web_server_url = _baseUrl;
 
 /**
  * Make HTTP request - compatible with both Node.js and Deno
